@@ -36,31 +36,40 @@ SUMMARY_LANG = os.environ.get("SUMMARY_LANG", "zh-CN")
 
 SYSTEM_PROMPT = """你是一个专业的社交媒体内容分析师。你的任务是：
 1. 将推文内容翻译成{lang}（如果已是目标语言则跳过翻译）
-2. 提炼出核心 takeaway（关键要点）
+2. 对每条推文逐一解读，提炼核心观点
 3. 生成一条适合发布到 X/Twitter 的总结推文
 
 要求：
+- 每条推文都需要单独解读，必须附带互动数据（点赞、转发、评论、浏览量）
 - Takeaway 要简洁有力，抓住核心观点
 - 总结推文不超过 280 字符
 - 如果是技术内容，保留关键术语
 - 输出 JSON 格式"""
 
-USER_PROMPT_TEMPLATE = """请分析以下来自 @{username} 的推文内容，提炼 takeaway 并生成总结推文。
+USER_PROMPT_TEMPLATE = """请分析以下来自 @{username} 的 Top {tweet_count} 热门推文（按互动量排序），逐条解读并生成总结。
 
---- 推文列表 ---
+--- 推文列表（按点赞+转发排序）---
 {tweets_text}
 --- 结束 ---
 
 请以如下 JSON 格式返回：
 {{
   "source_user": "@{username}",
-  "tweet_count": <分析的推文数量>,
-  "takeaways": [
-    "要点1",
-    "要点2",
-    ...
+  "tweet_count": {tweet_count},
+  "tweet_analyses": [
+    {{
+      "rank": 1,
+      "original_text": "原文摘要（前50字）",
+      "takeaway": "该条推文的核心要点解读",
+      "stats": {{
+        "likes": <点赞数>,
+        "retweets": <转发数>,
+        "replies": <评论数>,
+        "views": <浏览量>
+      }}
+    }}
   ],
-  "summary_tweet": "适合发布的总结推文（不超过 280 字符）",
+  "summary_tweet": "适合发布的总结推文（不超过 280 字符，需涵盖最核心的 1-2 个观点）",
   "topics": ["话题标签1", "话题标签2"]
 }}"""
 
@@ -171,11 +180,14 @@ def _format_tweets_text(tweets: list) -> str:
         text = tw.get("text", "")
         likes = tw.get("likes", 0)
         retweets = tw.get("retweets", 0)
+        replies = tw.get("replies_count", 0)
         views = tw.get("views", 0)
         created = tw.get("created_at", "")
+        engagement = likes + retweets
         parts.append(
-            f"[{i}] {text}\n"
-            f"    Likes: {likes} | RT: {retweets} | Views: {views} | {created}"
+            f"[#{i}] (engagement score: {engagement})\n"
+            f"    {text}\n"
+            f"    ❤️ Likes: {likes} | 🔁 RT: {retweets} | 💬 Replies: {replies} | 👁 Views: {views} | {created}"
         )
     return "\n\n".join(parts)
 
@@ -232,7 +244,11 @@ def summarize_tweets(username: str, tweets: list) -> dict:
 
     tweets_text = _format_tweets_text(tweets)
     system = SYSTEM_PROMPT.format(lang=SUMMARY_LANG)
-    user = USER_PROMPT_TEMPLATE.format(username=username, tweets_text=tweets_text)
+    user = USER_PROMPT_TEMPLATE.format(
+        username=username,
+        tweets_text=tweets_text,
+        tweet_count=len(tweets),
+    )
 
     try:
         raw = _call_llm(system, user)
@@ -252,22 +268,39 @@ def summarize_tweets(username: str, tweets: list) -> dict:
 def format_post_text(summary: dict) -> str:
     """Format the summary into a tweet-ready text.
 
-    Combines takeaways and the summary tweet into a publishable format.
+    Uses tweet_analyses (with per-tweet stats) if available,
+    falls back to takeaways for backward compatibility.
     """
     parts = []
     source = summary.get("source_user", "")
-    takeaways = summary.get("takeaways", [])
+    analyses = summary.get("tweet_analyses", [])
     summary_tweet = summary.get("summary_tweet", "")
     topics = summary.get("topics", [])
 
     if summary_tweet:
         parts.append(summary_tweet)
 
-    if takeaways:
+    if analyses:
         parts.append("")
-        parts.append("Key takeaways:")
-        for i, t in enumerate(takeaways[:3], 1):
-            parts.append(f"  {i}. {t}")
+        for a in analyses[:5]:
+            rank = a.get("rank", "")
+            takeaway = a.get("takeaway", "")
+            stats = a.get("stats", {})
+            likes = stats.get("likes", 0)
+            rt = stats.get("retweets", 0)
+            replies = stats.get("replies", 0)
+            views = stats.get("views", 0)
+            parts.append(
+                f"#{rank} {takeaway}\n"
+                f"   ❤️{likes} 🔁{rt} 💬{replies} 👁{views}"
+            )
+    else:
+        # Fallback: old takeaways format
+        takeaways = summary.get("takeaways", [])
+        if takeaways:
+            parts.append("")
+            for i, t in enumerate(takeaways[:5], 1):
+                parts.append(f"  {i}. {t}")
 
     if source:
         parts.append(f"\nvia {source}")
@@ -275,13 +308,7 @@ def format_post_text(summary: dict) -> str:
     if topics:
         parts.append(" ".join(f"#{t}" for t in topics[:3]))
 
-    text = "\n".join(parts)
-
-    # Trim to 280 chars if needed (Twitter limit)
-    if len(text) > 280:
-        text = text[:277] + "..."
-
-    return text
+    return "\n".join(parts)
 
 
 if __name__ == "__main__":

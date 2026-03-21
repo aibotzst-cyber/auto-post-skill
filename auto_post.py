@@ -44,6 +44,7 @@ DEFAULT_CONFIG = {
     "chrome_cdp_port": 9222,
     "camofox_port": 9377,
     "fetch_limit": 50,            # max tweets per user
+    "top_n": 5,                   # top N tweets by engagement per user
     "summary_lang": "zh-CN",
     "dry_run": False,
     "output_dir": "./output",
@@ -90,6 +91,16 @@ def filter_yesterday_tweets(tweets: list) -> list:
     return [tw for tw in tweets if is_yesterday(tw.get("created_at", ""))]
 
 
+def rank_tweets(tweets: list, top_n: int = 5) -> list:
+    """Sort tweets by engagement (likes + retweets) and return top N."""
+    scored = sorted(
+        tweets,
+        key=lambda tw: tw.get("likes", 0) + tw.get("retweets", 0),
+        reverse=True,
+    )
+    return scored[:top_n]
+
+
 # ---------------------------------------------------------------------------
 # Core pipeline
 # ---------------------------------------------------------------------------
@@ -98,12 +109,14 @@ def fetch_user_yesterday_tweets(
     username: str,
     limit: int = 50,
     camofox_port: int = 9377,
+    **kwargs,
 ) -> List[Dict]:
-    """Fetch a user's tweets from yesterday.
+    """Fetch a user's tweets from yesterday, ranked by engagement.
 
     Strategy:
-      1. Try FxTwitter timeline first (via Camofox + Nitter)
+      1. Fetch timeline via Camofox + Nitter
       2. Filter to yesterday's tweets only
+      3. Sort by likes + retweets, return top N
     """
     print(f"\n[auto_post] Fetching tweets from @{username}...")
 
@@ -124,6 +137,19 @@ def fetch_user_yesterday_tweets(
     yesterday_tweets = filter_yesterday_tweets(all_tweets)
     print(f"[auto_post] {len(yesterday_tweets)} tweets from yesterday")
 
+    # Rank by engagement and take top N
+    top_n = kwargs.get("top_n", 5)
+    if yesterday_tweets:
+        ranked = rank_tweets(yesterday_tweets, top_n=top_n)
+        print(f"[auto_post] Top {len(ranked)} by engagement (likes+RT):")
+        for i, tw in enumerate(ranked, 1):
+            likes = tw.get("likes", 0)
+            rt = tw.get("retweets", 0)
+            replies = tw.get("replies_count", 0)
+            views = tw.get("views", 0)
+            print(f"  #{i} ❤️{likes} 🔁{rt} 💬{replies} 👁{views} | {tw.get('text', '')[:60]}...")
+        return ranked
+
     return yesterday_tweets
 
 
@@ -133,6 +159,7 @@ def process_user(username: str, config: dict) -> Dict[str, Any]:
         username=username,
         limit=config.get("fetch_limit", 50),
         camofox_port=config.get("camofox_port", 9377),
+        top_n=config.get("top_n", 5),
     )
 
     if not tweets:
