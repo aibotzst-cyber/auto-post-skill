@@ -1,0 +1,13 @@
+{
+  "source_users": [
+    "elonmusk",
+    "kaboratoss"
+  ],
+  "post_account": "your_account_here",
+  "chrome_cdp_port": 9222,
+  "camofox_port": 9377,
+  "fetch_limit": 50,
+  "summary_lang": "zh-CN",
+  "dry_run": true,
+  "output_dir": "./output"
+}

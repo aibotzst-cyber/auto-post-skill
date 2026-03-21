@@ -1,7 +1,9 @@
 ---
-name: x-tweet-fetcher
+name: auto-post-skill
 description: >
-  Fetch tweets, replies, and user timelines from X/Twitter without login or API keys.
+  Auto-fetch yesterday's tweets from specified X/Twitter users, translate & summarize
+  into takeaways via AI, then post to your X account via Chrome CDP.
+  Built on x-tweet-fetcher for tweet crawling.
   Also supports Chinese platforms (Weibo, Bilibili, CSDN, WeChat).
   Includes camofox_search() for zero-cost Google search without API keys.
   Basic tweet fetching: zero dependencies. Replies/timelines/search: requires Camofox.
