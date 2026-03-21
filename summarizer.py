@@ -65,6 +65,7 @@ USER_PROMPT_TEMPLATE = """请深度分析以下来自 @{username} 的 Top {tweet
     {{
       "rank": 1,
       "original_text": "原文摘要（前50字）",
+      "tweet_url": "原文链接",
       "takeaways": [
         "洞察1：可操作的建议或反直觉观点",
         "洞察2：行业趋势或技术判断",
@@ -184,6 +185,18 @@ def _call_llm(system: str, user: str) -> str:
     return result
 
 
+def _build_tweet_url(tw: dict) -> str:
+    """Build the original tweet URL from available fields."""
+    url = tw.get("url", "")
+    if url:
+        return url
+    tweet_id = tw.get("tweet_id", "")
+    author = tw.get("screen_name", "") or tw.get("author", "").lstrip("@")
+    if tweet_id and author:
+        return f"https://x.com/{author}/status/{tweet_id}"
+    return ""
+
+
 def _format_tweets_text(tweets: list) -> str:
     """Format tweet list into readable text for the prompt."""
     parts = []
@@ -191,14 +204,16 @@ def _format_tweets_text(tweets: list) -> str:
         text = tw.get("text", "")
         likes = tw.get("likes", 0)
         retweets = tw.get("retweets", 0)
-        replies = tw.get("replies_count", 0)
+        replies = tw.get("replies_count", tw.get("replies", 0))
         views = tw.get("views", 0)
         created = tw.get("created_at", "")
+        tweet_url = _build_tweet_url(tw)
         engagement = likes + retweets
         parts.append(
             f"[#{i}] (engagement score: {engagement})\n"
             f"    {text}\n"
-            f"    ❤️ Likes: {likes} | 🔁 RT: {retweets} | 💬 Replies: {replies} | 👁 Views: {views} | {created}"
+            f"    ❤️ Likes: {likes} | 🔁 RT: {retweets} | 💬 Replies: {replies} | 👁 Views: {views} | {created}\n"
+            f"    🔗 {tweet_url}"
         )
     return "\n\n".join(parts)
 
@@ -305,9 +320,12 @@ def format_post_text(summary: dict) -> str:
             rt = stats.get("retweets", 0)
             replies = stats.get("replies", 0)
             views = stats.get("views", 0)
+            tweet_url = a.get("tweet_url", "")
             parts.append(f"\n📌 #{rank}  ❤️{likes} 🔁{rt} 💬{replies} 👁{views}")
             for t in takeaways[:5]:
                 parts.append(f"  • {t}")
+            if tweet_url:
+                parts.append(f"  🔗 {tweet_url}")
     else:
         # Fallback: old flat takeaways format
         takeaways = summary.get("takeaways", [])
