@@ -1,440 +1,274 @@
 <div align="center">
 
-# 🦞 x-tweet-fetcher
+# 🤖 Auto Post Skill
 
-**Fetch tweets, comments, timelines, and articles from X/Twitter — without login or API keys.**
+**自动抓取 AI 大佬推文 → AI 翻译总结 → 发布到你的 X 账号**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue.svg)](https://github.com/openclaw/openclaw)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7+-green.svg)](https://www.python.org)
-[![GitHub stars](https://img.shields.io/github/stars/ythx-101/x-tweet-fetcher?style=social)](https://github.com/ythx-101/x-tweet-fetcher)
+[![Built on x-tweet-fetcher](https://img.shields.io/badge/Built_on-x--tweet--fetcher-blue.svg)](https://github.com/ythx-101/x-tweet-fetcher)
 
-*Zero config · Agent-first JSON output · Cron-friendly exit codes · WeChat + X in one tool*
-
-[Quick Start](#-quick-start) · [Capabilities](#-capabilities) · [Cron Integration](#-cron-integration) · [How It Works](#-how-it-works)
+*每日自动追踪 30 位 AI/科技 KOL · AI 提炼 Takeaway · Chrome CDP 自动发推*
 
 </div>
 
 ---
 
-## 😤 Problem
+## 🎯 它做什么？
 
 ```
-You: fetch that tweet for me
-AI:  I can't access X/Twitter. Please copy-paste the content manually.
+每天自动执行：
 
-You: ...seriously?
+1. 抓取 30 位 AI 大佬昨天的推文（零 API Key）
+2. AI 翻译 + 总结成 Takeaway 要点
+3. 通过 Chrome CDP 协议自动发布到 @comaple123
 ```
 
-X has no free API. Scraping gets you blocked. Browser automation is fragile.
+整个流程全自动，支持 cron 定时执行。
 
-**x-tweet-fetcher** solves this: one command → structured JSON, ready for your agent to consume. No API keys, no login, no cookies.
+## 📐 架构
 
-## 📊 What You Get
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  x-tweet-fetcher │     │   AI Summarizer   │     │  Chrome CDP     │
+│  (抓取推文)       │ ──▶ │  (翻译+总结)       │ ──▶ │  (自动发推)      │
+│                   │     │                    │     │                  │
+│  · FxTwitter API  │     │  · Claude API      │     │  · WebSocket     │
+│  · Camofox+Nitter │     │  · OpenAI API      │     │  · 模拟输入       │
+│  · 零 API Key     │     │  · Ollama (本地)    │     │  · 自动点击发送   │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
 
-| Feature | Zero Deps | With Camofox | Output |
-|---------|:---------:|:------------:|--------|
-| Single tweet | ✅ | — | text, stats, media, quotes |
-| Reply comments | — | ✅ | threaded comment tree |
-| User timeline | — | ✅ | paginated tweet list (up to 200) |
-| X Articles (long-form) | — | ✅ | full article text |
-| X Lists | — | ✅ | paginated tweet list |
-| @mentions monitor | — | ✅ | incremental new mentions |
-| WeChat article search | ✅ | — | title, url, author, date |
-| Tweet discovery | ✅ | optional | keyword search results |
-| Google search | — | ✅ | zero API key alternative |
-| Chinese platforms | partial | ✅ | Weibo/Bilibili/CSDN/WeChat |
-| Obsidian export (X → Markdown + local assets) | ✅ | ✅ | Markdown note + `assets/` folder |
-| **Paper → Obsidian** (arXiv) | ✅ | — | Markdown + figures + formulas + tables |
-| User profile analysis | — | ✅ + LLM | MBTI, Big Five, topic graph |
-| **X-Tracker** (growth) | ✅ | — | burst detection, propagation analysis |
-| **Paper Recommend** | ✅ | — | related papers via OpenAlex (250M+ papers) |
-| **Author Finder** | ✅ | — | arxiv/GitHub → author X/Twitter profiles |
+## 🚀 快速开始
 
-> **For AI Agents**: All output is structured JSON. Import as Python modules for direct integration. Exit codes are cron-friendly (`0`=nothing new, `1`=new content).
-
-## 🚀 Quick Start
-
-### 30 seconds (experienced users)
+### 1. 安装
 
 ```bash
-git clone https://github.com/ythx-101/x-tweet-fetcher.git
-python3 scripts/fetch_tweet.py --url "https://x.com/user/status/123456"
-# Done. JSON output with text, likes, retweets, views, media URLs.
+git clone https://github.com/aibotzst-cyber/auto-post-skill.git
+cd auto-post-skill
 ```
 
-### For Agents (Python import)
+无需 `pip install`，纯 Python 标准库。
 
-```python
-from scripts.fetch_tweet import fetch_tweet
-
-# Fetch a tweet → structured data
-tweet = fetch_tweet("https://x.com/user/status/123456")
-# {"text": "...", "likes": 91, "retweets": 23, "views": 14468, ...}
-
-# Search WeChat articles (no API key)
-from scripts.sogou_wechat import sogou_wechat_search
-articles = sogou_wechat_search("AI Agent", max_results=10)
-
-# Discover tweets by keyword
-from scripts.x_discover import discover_tweets
-result = discover_tweets(["AI Agent", "automation"], max_results=5)
-
-# Google search via Camofox (no API key)
-from scripts.camofox_client import camofox_search
-results = camofox_search("fetch tweets without API key")
-```
-
-### CLI Examples
+### 2. 配置 AI 后端（三选一）
 
 ```bash
-# Single tweet (JSON)
-python3 scripts/fetch_tweet.py --url "https://x.com/user/status/123"
+# 方案 A：Claude（推荐）
+export ANTHROPIC_API_KEY="sk-ant-..."
+export SUMMARIZER_BACKEND="claude"
 
-# Human-readable output
-python3 scripts/fetch_tweet.py --url "https://x.com/user/status/123" --text-only
+# 方案 B：OpenAI / 兼容 API
+export OPENAI_API_KEY="sk-..."
+export SUMMARIZER_BACKEND="openai"
+# export OPENAI_BASE_URL="https://your-proxy/v1"  # 可选，自定义端点
 
-# Reply comments (requires Camofox)
-python3 scripts/fetch_tweet.py --url "https://x.com/user/status/123" --replies
-
-# User timeline (up to 200 tweets, auto-pagination)
-python3 scripts/fetch_tweet.py --user elonmusk --limit 50
-
-# X Lists
-python3 scripts/fetch_tweet.py --list "https://x.com/i/lists/123456"
-
-# X Articles (long-form)
-python3 scripts/fetch_tweet.py --article "https://x.com/i/article/123"
-
-# Monitor @mentions (cron-friendly)
-python3 scripts/fetch_tweet.py --monitor @username
-
-# WeChat article search
-python3 scripts/sogou_wechat.py --keyword "AI Agent" --limit 10 --json
-
-# Discover tweets by keyword
-python3 scripts/x_discover.py --keywords "AI Agent,LLM tools" --limit 5 --json
-
-# Chinese platforms (auto-detect: Weibo/Bilibili/CSDN/WeChat)
-python3 scripts/fetch_china.py --url "https://mp.weixin.qq.com/s/..."
-
-# Google search (zero API key)
-python3 scripts/camofox_client.py "OpenClaw AI agent"
-
-# User profile analysis
-python3 scripts/x-profile-analyzer.py --user elonmusk --count 100
-
-# ── X-Tracker: Tweet Growth Monitoring ──
-
-# Add a tweet to track
-python3 scripts/tweet_growth_cli.py --add "https://x.com/user/status/123" "my launch tweet"
-
-# List all tracked tweets
-python3 scripts/tweet_growth_cli.py --list
-
-# Run sampling (new tweets <48h, every 15min)
-python3 scripts/tweet_growth_cli.py --run --fast
-
-# Run sampling (all tweets, hourly)
-python3 scripts/tweet_growth_cli.py --run --normal
-
-# Generate analysis report
-python3 scripts/tweet_growth_cli.py --report 123456789
-
-# Report with topic cross-analysis
-python3 scripts/tweet_growth_cli.py --report 123456789 --cross
-
-# Export X content to Obsidian Markdown
-python3 scripts/to_obsidian.py --url "https://x.com/user/status/123" --output ./output
+# 方案 C：本地 Ollama（零成本）
+export SUMMARIZER_BACKEND="ollama"
+export OLLAMA_MODEL="llama3"
+# 需先安装 Ollama: https://ollama.ai
 ```
 
-### Obsidian export
+### 3. 启动 Chrome（用于发推）
 
 ```bash
-# Best fidelity: export from saved HTML snapshot
-python3 scripts/to_obsidian.py \
-  --html /tmp/article.html \
-  --tweet-url "https://x.com/user/status/123" \
-  --username user \
-  --output ./output
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222
 
-# Fallback: export directly from tweet URL
-python3 scripts/to_obsidian.py \
-  --url "https://x.com/user/status/123" \
-  --output ./output
+# Linux
+google-chrome --remote-debugging-port=9222
+
+# 确保已登录 @comaple123 的 X 账号
 ```
 
-Output structure:
-
-```text
-output/
-├── Some-Title.md
-└── assets/
-    └── Some-Title/
-        ├── image1.jpg
-        └── image2.png
-```
-
-The exporter preserves source text as faithfully as possible, downloads images locally, and rewrites image references for direct use in Obsidian.
-
-### Paper → Obsidian (arXiv)
-
-Export arXiv papers as Obsidian-ready Markdown with all figures, LaTeX formulas, and tables preserved.
+### 4. 运行
 
 ```bash
-# From arXiv ID
-python3 scripts/paper_to_obsidian.py --arxiv 2401.02385 --output ./papers/
+# Dry Run — 只看结果，不发推
+python3 auto_post.py --dry-run
 
-# With custom tags
-python3 scripts/paper_to_obsidian.py --arxiv 1706.03762 --tags "transformer,attention" --output ./papers/
+# 指定用户
+python3 auto_post.py --users karpathy,sama --dry-run
 
-# From ar5iv URL
-python3 scripts/paper_to_obsidian.py --url "https://ar5iv.labs.arxiv.org/html/2401.02385" --output ./papers/
+# 实际发推！
+python3 auto_post.py --post
 
-# From local HTML
-python3 scripts/paper_to_obsidian.py --html /tmp/paper.html --output ./papers/
+# 使用配置文件
+python3 auto_post.py --config auto_post_config.json --post
 ```
 
-Output:
+## 👥 追踪的 KOL（30 位）
 
-```text
-papers/
-├── Attention-Is-All-You-Need.md
-└── assets/
-    └── Attention-Is-All-You-Need/
-        ├── ModalNet-21.png
-        ├── ModalNet-20.png
-        └── x1.png
+### AI 学术大佬
+| 姓名 | 账号 | 身份 |
+|------|------|------|
+| Yann LeCun | @ylecun | Meta AI 首席科学家，图灵奖得主 |
+| Geoffrey Hinton | @geoffreyhinton | AI 教父，图灵奖得主 |
+| Andrew Ng | @AndrewYNg | 斯坦福教授，Coursera 联合创始人 |
+| Andrej Karpathy | @karpathy | 前 Tesla AI 总监，前 OpenAI |
+| Fei-Fei Li | @drfeifei | 斯坦福教授，ImageNet 创始人 |
+| François Chollet | @fchollet | Keras 作者，Google |
+| Ian Goodfellow | @goodfellow_ian | GAN 发明者 |
+| Pieter Abbeel | @pabbeel | UC Berkeley 教授，Covariant CEO |
+| Sebastian Raschka | @rasbt | ML 教育家，《Python ML》作者 |
+| Christopher Olah | @ch402 | Anthropic 联合创始人 |
+
+### AI 公司领袖
+| 姓名 | 账号 | 身份 |
+|------|------|------|
+| Sam Altman | @sama | OpenAI CEO |
+| Greg Brockman | @gdb | OpenAI 联合创始人 |
+| Demis Hassabis | @demishassabis | Google DeepMind CEO，诺贝尔奖得主 |
+| Dario Amodei | @darioamodei | Anthropic CEO |
+| Elon Musk | @elonmusk | Tesla/xAI CEO |
+
+### AI 内容与社区
+| 姓名 | 账号 | 身份 |
+|------|------|------|
+| Lex Fridman | @lexfridman | AI 播客主持人 |
+| Rowan Cheung | @rowancheung | The Rundown AI 创始人 |
+| Ben Tossell | @bentossell | Ben's Bites 创始人 |
+| Nathan Lambert | @natolambert | AI 研究员，RLHF 专家 |
+| Yohei Nakajima | @yoheinakajima | BabyAGI 作者 |
+| McKay Wrigley | @mckaywrigley | AI 开发者工具创始人 |
+| Matt Shumer | @mattshumer_ | HyperWrite CEO |
+| Riley Brown | @rileybrown_ai | AI 工程师 |
+| Santiago Valdarrama | @svpino | ML 工程师，AI 教育者 |
+
+### AI 研究与工程
+| 姓名 | 账号 | 身份 |
+|------|------|------|
+| Jim Fan | @DrJimFan | NVIDIA 高级研究科学家 |
+| Lilian Weng | @lilianweng | OpenAI 安全负责人 |
+| Thomas Wolf | @Thom_Wolf | Hugging Face 联合创始人 |
+| Jeff Dean | @JeffDean | Google 首席科学家 |
+
+### AI 机构
+| 名称 | 账号 | 简介 |
+|------|------|------|
+| Andreessen Horowitz | @a16z | 顶级 AI/科技 VC |
+| Hugging Face | @huggingface | 开源 AI 社区 |
+
+## ⚙️ 配置文件
+
+`auto_post_config.json`:
+
+```json
+{
+  "source_users": ["karpathy", "sama", "..."],
+  "post_account": "comaple123",
+  "chrome_cdp_port": 9222,
+  "camofox_port": 9377,
+  "fetch_limit": 50,
+  "summary_lang": "zh-CN",
+  "dry_run": true,
+  "output_dir": "./output"
+}
 ```
 
-Features:
-- **YAML frontmatter**: title, authors, date, arxiv_id, tags
-- **Figures**: all images downloaded to local `assets/` directory
-- **Math**: LaTeX formulas preserved as `$...$` (inline) and `$$...$$` (block), renders natively in Obsidian
-- **Tables**: converted to Markdown tables
-- **References**: numbered bibliography list
-- **Auto TOC**: generated from section headings (disable with `--no-toc`)
+| 字段 | 说明 | 默认值 |
+|------|------|--------|
+| `source_users` | 要抓取的用户列表 | 30 位 KOL |
+| `post_account` | 发推目标账号 | comaple123 |
+| `chrome_cdp_port` | Chrome 调试端口 | 9222 |
+| `camofox_port` | Camofox 端口 | 9377 |
+| `fetch_limit` | 每用户最大抓取数 | 50 |
+| `summary_lang` | 总结输出语言 | zh-CN |
+| `dry_run` | 是否模拟运行 | true |
+| `output_dir` | 结果保存目录 | ./output |
 
-Uses ar5iv (LaTeXML HTML version of arXiv papers) + arXiv API for metadata. Zero dependencies beyond Python stdlib.
-
-## ⏰ Cron Integration
-
-All monitoring scripts use exit codes for automation:
-
-| Exit Code | Meaning |
-|:---------:|---------|
-| `0` | No new content |
-| `1` | New content found |
-| `2` | Error |
+## ⏰ Cron 定时执行
 
 ```bash
-# Check mentions every 30 min
-*/30 * * * * python3 fetch_tweet.py --monitor @username || notify-send "New mentions!"
+# 每天早上 8 点自动执行（抓取昨天的推文 + 发推）
+0 8 * * * cd /path/to/auto-post-skill && python3 auto_post.py --post >> logs/auto_post.log 2>&1
 
-# Discover tweets daily
-0 9 * * * python3 x_discover.py --keywords "AI Agent" --cache ~/.cache/discover.json --json >> ~/discoveries.jsonl
-
-# X-Tracker: dual-frequency sampling
-*/15 * * * * python3 tweet_growth_cli.py --run --fast    # New tweets (<48h)
-0 * * * *    python3 tweet_growth_cli.py --run --normal  # All tweets (hourly)
+# 每天早上 8 点 Dry Run（仅生成总结，不发推）
+0 8 * * * cd /path/to/auto-post-skill && python3 auto_post.py --dry-run >> logs/auto_post.log 2>&1
 ```
 
-## 📈 X-Tracker: Tweet Growth Analysis
-
-Track your tweets' growth and detect viral moments — inspired by semiconductor ETCH Endpoint Detection.
-
-### How It Works
+## 🔧 CLI 参数
 
 ```
-New tweet posted
-    │
-    ▼
-Fast sampling (every 15min for 48h)
-    │
-    ├── dV/dt spike? ──────── Candidate burst
-    │                              │
-    │                    3 consecutive? ── ★ BURST CONFIRMED
-    │                              │
-    │                    RT/view ratio ── Influencer vs Algorithm
-    │
-    ▼
-Normal sampling (hourly)
-    │
-    └── 6× growth < 2%/h ── Long tail
+python3 auto_post.py [OPTIONS]
+
+选项：
+  --config, -c FILE    配置文件路径
+  --users, -u USERS    逗号分隔的用户名（覆盖配置文件）
+  --dry-run, -n        模拟运行，不实际发推（默认）
+  --post               实际发推
+  --limit N            每用户最大抓取数（默认 50）
+  --cdp-port PORT      Chrome CDP 端口（默认 9222）
+  --camofox-port PORT  Camofox 端口（默认 9377）
+  --output, -o DIR     输出目录（默认 ./output）
 ```
 
-### Detection Algorithm
-
-| Component | Method | Purpose |
-|-----------|--------|---------|
-| **Derivative detection** | dV/dt per hour | Spot sudden acceleration |
-| **Sliding window** | 5-sample moving average | Filter noise |
-| **Multi-signal fusion** | views×1 + likes×1 + bookmarks×1.5 + RT×3 | Weighted composite score |
-| **Burst confirmation** | 3 consecutive windows above threshold | Prevent false positives |
-| **Surge override** | Single window +100%/h | Catch massive spikes |
-| **Saturation** | 6 samples < 2%/h growth | Detect long tail |
-| **Propagation** | RT-per-1k-views ratio | Influencer vs algorithm driven |
-
-### Report Example
+## 📂 项目结构
 
 ```
-══════════════════════════════════════════════════
-  推文增长报告：my launch tweet
-  ID: 2024390277386076183
-══════════════════════════════════════════════════
-
-  ── 整体增长 ──
-  浏览：  4,560 → 11,245  (+146.6%)
-  点赞：  40 → 73  (+82.5%)
-  收藏：  35 → 88  (+151.4%)
-
-  ── 爆点时间窗口 ──
-  开始：2026-02-20 12:00
-  结束：2026-02-21 08:00
-  持续：20.0h
-  新增浏览：+4,898
-  峰值增速：103%/h
-
-  ── 传播模式 ──
-  混合传播（平均 0.53‰ RT/千次浏览）
-══════════════════════════════════════════════════
+auto-post-skill/
+├── auto_post.py           # 主流程编排（抓取→过滤→总结→发布）
+├── auto_post_config.json  # 配置文件（用户列表、端口等）
+├── cdp_poster.py          # Chrome CDP 发推模块
+├── summarizer.py          # AI 翻译总结模块（Claude/OpenAI/Ollama）
+├── SKILL.md               # Skill 定义
+├── CHANGELOG.md           # 更新日志
+├── VERSION                # 版本号
+├── scripts/               # x-tweet-fetcher 核心（已集成）
+│   ├── fetch_tweet.py     # 推文抓取（单条/时间线/评论/列表）
+│   ├── camofox_client.py  # Camofox 浏览器客户端
+│   ├── fetch_china.py     # 国内平台（微博/B站/CSDN/微信）
+│   ├── sogou_wechat.py    # 搜狗微信搜索
+│   ├── x_discover.py      # 关键词发现推文
+│   ├── to_obsidian.py     # 导出到 Obsidian
+│   ├── paper_to_obsidian.py  # 论文导出到 Obsidian
+│   ├── tweet_growth_cli.py   # 推文增长追踪
+│   ├── paper_recommend.py    # 论文推荐
+│   ├── arxiv_author_finder.py # 作者查找
+│   └── ...
+└── output/                # 运行结果（git ignored）
 ```
 
-### Configuration
+## 🔌 依赖
 
-All thresholds in `scripts/growth_config.py`:
+| 组件 | 依赖 | 说明 |
+|------|------|------|
+| 推文抓取（基础） | Python 3.7+ | 零外部依赖 |
+| 推文抓取（高级） | [Camofox](https://github.com/jo-inc/camofox-browser) | 评论/时间线/搜索 |
+| AI 总结 | API Key（Claude/OpenAI）或 Ollama | 三选一 |
+| 自动发推 | Chrome + `--remote-debugging-port` | 需登录目标账号 |
 
-```python
-ETCH_SPIKE_RATE     = 0.30   # 30%/h triggers candidate
-ETCH_CONFIRM_COUNT  = 3      # 3 consecutive = confirmed
-WEIGHT_BOOKMARKS    = 1.5    # Bookmarks weighted 1.5x
-WEIGHT_RETWEETS     = 3.0    # Retweets weighted 3x
-```
-
-## 🔧 Camofox Setup (Optional)
-
-Required for: comments, timelines, mentions, Google search, non-WeChat Chinese platforms.
-
-```bash
-# Option 1: OpenClaw plugin
-openclaw plugins install @askjo/camofox-browser
-
-# Option 2: Standalone
-git clone https://github.com/jo-inc/camofox-browser
-cd camofox-browser && npm install && npm start  # Port 9377
-```
-
-[Camofox](https://github.com/jo-inc/camofox-browser) is built on [Camoufox](https://camoufox.com) — a Firefox fork with C++ level fingerprint spoofing. Bypasses Google, Cloudflare, and most anti-bot detection.
-
-## 📐 How It Works
+## 📝 工作流程详解
 
 ```
-                    ┌─────────────┐
- --url              │  FxTwitter  │  ← Public API, no auth
-                    │  (free)     │
-                    └──────┬──────┘
-                           │ JSON
-┌──────────┐       ┌──────┴──────┐       ┌──────────┐
-│ --replies│       │             │       │  Agent   │
-│ --user   │──────▶│  Camofox    │──────▶│  (JSON)  │
-│ --monitor│       │  (browser)  │       │          │
-│ --list   │       └─────────────┘       └──────────┘
-└──────────┘
-                    ┌─────────────┐
- --keyword          │ DuckDuckGo  │  ← No API key
- sogou_wechat       │ Sogou       │
-                    └─────────────┘
+1. 抓取阶段
+   ├── 遍历 30 位 KOL
+   ├── 通过 FxTwitter API 获取时间线（零 Key）
+   ├── 高级模式：Camofox + Nitter 翻页抓取
+   └── 按日期过滤出「昨天」的推文
+
+2. 总结阶段
+   ├── 将每位用户的推文发送给 AI
+   ├── AI 翻译成中文（如果是英文）
+   ├── 提炼 Takeaway 关键要点
+   └── 生成 ≤280 字符的总结推文
+
+3. 发布阶段
+   ├── 通过 Chrome CDP WebSocket 连接浏览器
+   ├── 导航到 x.com/compose/post
+   ├── 模拟输入推文内容
+   └── 点击发送按钮
 ```
-
-- **Basic tweets**: [FxTwitter](https://github.com/FxEmbed/FxEmbed) public API (no auth)
-- **Comments/Timeline/Mentions**: Camofox headless Firefox + Nitter parsing
-- **Views supplement**: FxTwitter API auto-fills view counts missing from Nitter
-- **WeChat search**: Sogou search (direct HTTP, no browser)
-- **Tweet discovery**: DuckDuckGo with Camofox Google fallback
-- **Chinese platforms**: Direct HTTP for WeChat; Camofox for others
-
-## 📚 Academic Paper Mode
-
-Found a paper on X? Get related papers and author Twitter handles in one command.
-
-### Paper Recommendations
-
-```bash
-# From a tweet containing a paper link
-python3 scripts/paper_recommend.py --tweet "https://x.com/someone/status/123"
-
-# From ArXiv
-python3 scripts/paper_recommend.py --arxiv 1706.03762
-
-# From GitHub repo
-python3 scripts/paper_recommend.py --github "https://github.com/org/repo"
-
-# From paper title
-python3 scripts/paper_recommend.py --title "Attention Is All You Need"
-
-# Chinese output
-python3 scripts/paper_recommend.py --arxiv 1706.03762 --zh
-
-# JSON output
-python3 scripts/paper_recommend.py --arxiv 1706.03762 --json
-```
-
-Output: Top-N related papers with title, authors, citation count, abstract, and links — ranked by citations across references, cited-by, and same-author papers.
-
-### Author Twitter Finder
-
-```bash
-# Find paper authors' Twitter/X handles
-python3 scripts/arxiv_author_finder.py --arxiv 1706.03762
-
-# With verbose output
-python3 scripts/arxiv_author_finder.py --arxiv "https://arxiv.org/abs/2603.10165" --verbose
-```
-
-4-layer cascade: ArXiv API → GitHub profiles → Scholars dataset → Search engines.
-
-### APIs Used (all free, no key required)
-
-| API | Purpose | Key Required? |
-|-----|---------|:------------:|
-| ArXiv | Paper metadata | ❌ |
-| Semantic Scholar | Citations, recommendations | ❌ (optional key for higher rate limits) |
-| GitHub REST | Author Twitter lookup | ❌ (optional token for higher rate limits) |
-
-Optional environment variables for better performance:
-```bash
-export S2_API_KEY="your-key"       # https://semanticscholar.org/product/api
-export GITHUB_TOKEN="your-token"   # https://github.com/settings/tokens
-```
-
-## 📦 Requirements
-
-| | Required | Optional |
-|--|----------|----------|
-| **Runtime** | Python 3.7+ | — |
-| **Basic tweets** | Nothing else | — |
-| **Advanced features** | [Camofox](https://github.com/jo-inc/camofox-browser) | `duckduckgo-search` (pip) |
-| **Academic Paper Mode** | Nothing else | `pip install duckduckgo-search` (improves author search coverage) |
-| **Profile analysis** | Camofox + LLM API key | — |
-
-## 🤝 Contributing
-
-Issues and PRs welcome! Especially:
-
-- 🐛 Parsing edge cases (new Nitter layouts, X Article formats)
-- 🌍 New platform support (Threads, Mastodon, etc.)
-- 📊 Performance improvements for large-scale fetching
 
 ## 📄 License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — 基于 [x-tweet-fetcher](https://github.com/ythx-101/x-tweet-fetcher) 构建
 
 ---
 
 <div align="center">
 
-*Built for AI agents. Used by [OpenClaw](https://github.com/openclaw/openclaw) 🦞*
+*每天 5 分钟，掌握 AI 圈最新动态 🚀*
 
-**[GitHub](https://github.com/ythx-101/x-tweet-fetcher)** · **[Issues](https://github.com/ythx-101/x-tweet-fetcher/issues)** · **[OpenClaw Q&A](https://github.com/ythx-101/openclaw-qa)**
+**发布到 [@comaple123](https://x.com/comaple123)**
 
 </div>
