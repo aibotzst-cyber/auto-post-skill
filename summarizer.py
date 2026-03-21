@@ -34,19 +34,24 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3")
 SUMMARY_LANG = os.environ.get("SUMMARY_LANG", "zh-CN")
 
-SYSTEM_PROMPT = """你是一个专业的社交媒体内容分析师。你的任务是：
+SYSTEM_PROMPT = """你是一个专业的社交媒体内容分析师，擅长从大佬推文中提炼对他人有用的洞察。
+
+你的任务：
 1. 将推文内容翻译成{lang}（如果已是目标语言则跳过翻译）
-2. 对每条推文逐一解读，提炼核心观点
+2. 对每条推文逐一深度解读，提炼 3-5 条 takeaway 洞察
 3. 生成一条适合发布到 X/Twitter 的总结推文
 
-要求：
-- 每条推文都需要单独解读，必须附带互动数据（点赞、转发、评论、浏览量）
-- Takeaway 要简洁有力，抓住核心观点
-- 总结推文不超过 280 字符
-- 如果是技术内容，保留关键术语
+核心原则 —— 以「对读者有用」为最高优先级：
+- 每条推文必须提炼 3-5 个 takeaway，不是简单复述，而是提炼出可操作的洞察
+- Takeaway 要回答：「读者看完能学到什么？能用在哪里？该怎么做？」
+- 优先提炼：可操作的建议、反直觉的观点、行业趋势判断、技术选型参考、避坑经验
+- 如果是技术内容，保留关键术语并解释其意义
+- 每条推文必须附带互动数据（点赞、转发、评论、浏览量）
 - 输出 JSON 格式"""
 
-USER_PROMPT_TEMPLATE = """请分析以下来自 @{username} 的 Top {tweet_count} 热门推文（按互动量排序），逐条解读并生成总结。
+USER_PROMPT_TEMPLATE = """请深度分析以下来自 @{username} 的 Top {tweet_count} 热门推文（按互动量排序）。
+
+要求：对每条推文提炼 3-5 条有价值的 takeaway 洞察，以「对他人有用」为原则。
 
 --- 推文列表（按点赞+转发排序）---
 {tweets_text}
@@ -60,7 +65,13 @@ USER_PROMPT_TEMPLATE = """请分析以下来自 @{username} 的 Top {tweet_count
     {{
       "rank": 1,
       "original_text": "原文摘要（前50字）",
-      "takeaway": "该条推文的核心要点解读",
+      "takeaways": [
+        "洞察1：可操作的建议或反直觉观点",
+        "洞察2：行业趋势或技术判断",
+        "洞察3：对从业者的启示",
+        "洞察4：（可选）延伸思考",
+        "洞察5：（可选）相关建议"
+      ],
       "stats": {{
         "likes": <点赞数>,
         "retweets": <转发数>,
@@ -69,7 +80,7 @@ USER_PROMPT_TEMPLATE = """请分析以下来自 @{username} 的 Top {tweet_count
       }}
     }}
   ],
-  "summary_tweet": "适合发布的总结推文（不超过 280 字符，需涵盖最核心的 1-2 个观点）",
+  "summary_tweet": "适合发布的总结推文（不超过 280 字符，涵盖最核心的 1-2 个洞察）",
   "topics": ["话题标签1", "话题标签2"]
 }}"""
 
@@ -281,21 +292,24 @@ def format_post_text(summary: dict) -> str:
         parts.append(summary_tweet)
 
     if analyses:
-        parts.append("")
         for a in analyses[:5]:
             rank = a.get("rank", "")
-            takeaway = a.get("takeaway", "")
+            # Support both new 'takeaways' list and old 'takeaway' string
+            takeaways = a.get("takeaways", [])
+            if not takeaways:
+                single = a.get("takeaway", "")
+                if single:
+                    takeaways = [single]
             stats = a.get("stats", {})
             likes = stats.get("likes", 0)
             rt = stats.get("retweets", 0)
             replies = stats.get("replies", 0)
             views = stats.get("views", 0)
-            parts.append(
-                f"#{rank} {takeaway}\n"
-                f"   ❤️{likes} 🔁{rt} 💬{replies} 👁{views}"
-            )
+            parts.append(f"\n📌 #{rank}  ❤️{likes} 🔁{rt} 💬{replies} 👁{views}")
+            for t in takeaways[:5]:
+                parts.append(f"  • {t}")
     else:
-        # Fallback: old takeaways format
+        # Fallback: old flat takeaways format
         takeaways = summary.get("takeaways", [])
         if takeaways:
             parts.append("")
