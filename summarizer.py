@@ -169,16 +169,74 @@ def _call_ollama(system: str, user: str) -> Optional[str]:
     return data.get("message", {}).get("content", "")
 
 
+def _call_mock(system: str, user: str) -> Optional[str]:
+    """Mock backend for testing — parses tweets from prompt and generates structured output."""
+    import re
+
+    # Extract username
+    m = re.search(r"@(\w+)", user)
+    username = m.group(1) if m else "unknown"
+
+    # Extract tweet blocks from the prompt
+    blocks = re.split(r"\[#(\d+)\]", user)
+    analyses = []
+    for i in range(1, len(blocks), 2):
+        rank = int(blocks[i])
+        body = blocks[i + 1] if i + 1 < len(blocks) else ""
+
+        # Extract text (first line after engagement score)
+        text_m = re.search(r"\n\s+(.+?)(?:\n|$)", body)
+        text = text_m.group(1).strip()[:50] if text_m else ""
+
+        # Extract stats
+        likes = int(m.group(1)) if (m := re.search(r"Likes:\s*([\d,]+)", body)) else 0
+        rt = int(m.group(1)) if (m := re.search(r"RT:\s*([\d,]+)", body)) else 0
+        replies = int(m.group(1)) if (m := re.search(r"Replies:\s*([\d,]+)", body)) else 0
+        views = int(m.group(1)) if (m := re.search(r"Views:\s*([\d,]+)", body)) else 0
+
+        # Extract URL
+        url_m = re.search(r"🔗\s+(https://\S+)", body)
+        tweet_url = url_m.group(1) if url_m else ""
+
+        analyses.append({
+            "rank": rank,
+            "original_text": text,
+            "tweet_url": tweet_url,
+            "takeaways": [
+                f"核心观点：{text[:30]}... 值得关注",
+                f"互动数据显示该话题引发 {likes:,} 次点赞，社区共鸣强烈",
+                f"对从业者启示：关注此方向可能带来新机遇",
+            ],
+            "stats": {
+                "likes": likes,
+                "retweets": rt,
+                "replies": replies,
+                "views": views,
+            },
+        })
+
+    top_text = analyses[0]["original_text"][:20] if analyses else ""
+    result = {
+        "source_user": f"@{username}",
+        "tweet_count": len(analyses),
+        "tweet_analyses": analyses,
+        "summary_tweet": f"@{username} 昨日热门 Top {len(analyses)}：{top_text}... 等精彩内容",
+        "topics": ["AI", "Tech"],
+    }
+    return json.dumps(result, ensure_ascii=False)
+
+
 def _call_llm(system: str, user: str) -> str:
     """Call the configured LLM backend."""
     backends = {
         "claude": _call_claude,
         "openai": _call_openai,
         "ollama": _call_ollama,
+        "mock": _call_mock,
     }
     fn = backends.get(BACKEND)
     if not fn:
-        raise ValueError(f"Unknown backend: {BACKEND}. Use: claude, openai, ollama")
+        raise ValueError(f"Unknown backend: {BACKEND}. Use: claude, openai, ollama, mock")
     result = fn(system, user)
     if not result:
         raise RuntimeError(f"Empty response from {BACKEND}")
