@@ -14,7 +14,7 @@ Usage:
   export SOGOU_SSH_HOST=user@host
   python3 sogou_wechat.py --keyword "AI Agent" --via-ssh
 
-Workflow: Sogou search → get titles → Google/DDG find real WeChat URL → fetch_china.py reads full text
+Workflow: Sogou search → get titles → Google/DDG find real WeChat URL → use web_fetch for full text
 """
 
 from urllib.parse import quote
@@ -252,44 +252,13 @@ def sogou_wechat_search(keyword, max_results=10):
 
 
 def resolve_sogou_link(sogou_url, port=9377):
-    """Resolve Sogou redirect link to real mp.weixin.qq.com URL via Camofox."""
-    try:
-        from camofox_client import camofox_open_tab, camofox_snapshot, camofox_close_tab
-        import time
-        tab_id = camofox_open_tab(sogou_url, f"resolve-{int(time.time())}", port=port)
-        if not tab_id:
-            return sogou_url
-        time.sleep(5)
-        snapshot = camofox_snapshot(tab_id, port=port)
-        camofox_close_tab(tab_id, port=port)
-        if snapshot:
-            # Look for mp.weixin.qq.com in the final page URL or content
-            import re
-            mp_match = re.search(r'(https?://mp\.weixin\.qq\.com/s/[A-Za-z0-9_-]+)', snapshot)
-            if mp_match:
-                return mp_match.group(1)
-            # Check for canonical URL
-            canon = re.search(r'canonical.*?(https?://mp\.weixin\.qq\.com[^\s"<>]+)', snapshot)
-            if canon:
-                return canon.group(1)
-        return sogou_url
-    except Exception:
-        return sogou_url
+    """Resolve Sogou redirect link to real mp.weixin.qq.com URL via HTTP redirect following."""
+    return sogou_url  # Browser dependency removed; direct HTTP resolve not yet implemented
 
 
 def resolve_via_google(title, port=9377):
-    """Resolve article title to real mp.weixin.qq.com URL via Google search."""
-    try:
-        from camofox_client import camofox_search
-        query = f'site:mp.weixin.qq.com "{title}"'
-        results = camofox_search(query, num=3, port=port)
-        for r in results:
-            url = r.get('url', '')
-            if 'mp.weixin.qq.com' in url:
-                return url
-    except Exception:
-        pass
-    # Fallback: try DuckDuckGo
+    """Resolve article title to real mp.weixin.qq.com URL via search."""
+    # Try DuckDuckGo
     try:
         from duckduckgo_search import DDGS
         import warnings
@@ -311,7 +280,7 @@ def main():
     parser.add_argument("--keyword", "-k", required=True, help="Search keyword")
     parser.add_argument("--limit", "-l", type=int, default=10, help="Max results")
     parser.add_argument("--json", "-j", action="store_true", help="Output JSON")
-    parser.add_argument("--resolve", "-r", action="store_true", help="Resolve Sogou links to real WeChat URLs (requires Camofox)")
+    parser.add_argument("--resolve", "-r", action="store_true", help="Resolve Sogou links to real WeChat URLs (deprecated - browser removed)")
     parser.add_argument("--via-ssh", action="store_true", help="Route search via SSH proxy (set SOGOU_SSH_HOST env var)")
     parser.add_argument("--via-router", action="store_true", help="Route search via home router (cmd-queue pattern, 24/7)")
     args = parser.parse_args()
@@ -331,7 +300,7 @@ def main():
                 r['url'] = real_url
                 r['resolved'] = True
             else:
-                # Fallback: try Camofox direct resolve
+                # Browser removed - resolve not available
                 resolved = resolve_sogou_link(r['url'])
                 if resolved != r['url']:
                     r['url'] = resolved
