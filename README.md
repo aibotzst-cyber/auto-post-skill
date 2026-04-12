@@ -20,7 +20,7 @@
 
 1. 抓取 30 位 AI 大佬昨天的推文（零 API Key）
 2. AI 翻译 + 总结成 Takeaway 要点
-3. 通过 Chrome CDP 协议自动发布到 @comaple123
+3. 通过 Chrome CDP 协议自动发布到 @YOUR_ACCOUNT
 ```
 
 整个流程全自动，支持 cron 定时执行。
@@ -77,7 +77,7 @@ export OLLAMA_MODEL="llama3"
 # Linux
 google-chrome --remote-debugging-port=9222
 
-# 确保已登录 @comaple123 的 X 账号
+# 确保已登录你的 X 账号
 ```
 
 ### 4. 运行
@@ -155,7 +155,7 @@ python3 auto_post.py --config auto_post_config.json --post
 ```json
 {
   "source_users": ["karpathy", "sama", "..."],
-  "post_account": "comaple123",
+  "post_account": "YOUR_ACCOUNT",
   "chrome_cdp_port": 9222,
   "camofox_port": 9377,
   "fetch_limit": 50,
@@ -168,7 +168,7 @@ python3 auto_post.py --config auto_post_config.json --post
 | 字段 | 说明 | 默认值 |
 |------|------|--------|
 | `source_users` | 要抓取的用户列表 | 30 位 KOL |
-| `post_account` | 发推目标账号 | comaple123 |
+| `post_account` | 发推目标账号 | YOUR_ACCOUNT |
 | `chrome_cdp_port` | Chrome 调试端口 | 9222 |
 | `camofox_port` | Camofox 端口 | 9377 |
 | `fetch_limit` | 每用户最大抓取数 | 50 |
@@ -269,6 +269,6 @@ auto-post-skill/
 
 *每天 5 分钟，掌握 AI 圈最新动态 🚀*
 
-**发布到 [@comaple123](https://x.com/comaple123)**
+**发布到你配置的 X 账号**
 
 </div>

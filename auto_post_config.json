@@ -31,7 +31,7 @@
     "a16z",
     "huggingface"
   ],
-  "post_account": "comaple123",
+  "post_account": "YOUR_ACCOUNT",
   "chrome_cdp_port": 9222,
   "camofox_port": 9377,
   "fetch_limit": 50,
